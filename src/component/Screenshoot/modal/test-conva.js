@@ -145,7 +145,7 @@ const DrawAnnotations = ( props ) => {
 const TestKonva = ( props ) => {
   const { image } = props
 
-  const [highlight, setHighlight] = useState('lorem');
+  const [highlight, setHighlight] = useState('');
   const [highlightBoxes, setHighlightBoxes] = useState([]);
   const [ocrLog, setOcrLog] = useState(null);
   const [ocrWords, setOcrWords] = useState([]);
