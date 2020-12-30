@@ -1,10 +1,11 @@
-import React, { useState, useRef } from "react";
-import { Stage, Layer, Image, } from "react-konva";
+import React, { useState, useRef, useEffect } from "react";
+import { Stage, Layer, Image, Rect } from "react-konva";
 import useImage from 'use-image';
 import Rectangle from './reactangle'
+import Tesseract from 'tesseract.js';
 
 const DrawAnnotations = ( props ) => {
-  const { images } = props
+  const { images, highlightBoxes } = props
   const [ image ] = useImage( images )
   const [ annotations, setAnnotations ] = useState( [] );
   const [ newAnnotation, setNewAnnotation ] = useState( [] );
@@ -97,6 +98,11 @@ const DrawAnnotations = ( props ) => {
       >
         <Layer >
           <Image image={ image } ref={ imgRef } />
+          {
+            highlightBoxes.map((box, i) => (
+              <Rect x={ box.x0 } y={ box.y0 } width={ box.x1 - box.x0 } height={ box.y1 - box.y0 } fill='red' opacity={ 0.5 } />
+            ))
+          }
           { annotationsToDraw.map( ( value, index ) => {
             return (
               <Rectangle
@@ -138,10 +144,51 @@ const DrawAnnotations = ( props ) => {
 
 const TestKonva = ( props ) => {
   const { image } = props
+
+  const [highlight, setHighlight] = useState('lorem');
+  const [highlightBoxes, setHighlightBoxes] = useState([]);
+  const [ocrLog, setOcrLog] = useState(null);
+  const [ocrWords, setOcrWords] = useState([]);
+
+  useEffect(() => {
+    if(image) {
+      Tesseract.recognize(
+        image,
+        'eng',
+        { logger: log => {
+          console.log(log);
+          setOcrLog(log);
+        } }
+      ).then(({ data }) => {
+        setOcrWords(data.words)
+      })
+    }
+  }, [image])
+
+  useEffect(() => {
+    const highlitedWords = ocrWords.filter(word => word.text.toLowerCase() === highlight.toLowerCase())
+    const newHighlightBoxes = highlitedWords.map(word => word.bbox)
+    setHighlightBoxes(newHighlightBoxes);
+  }, [ocrWords, highlight])
+
+  const keywords = [
+    'Lorem',
+    'Ipsum'
+  ]
+
   return (
     <div>
       <p>Start to draw!</p>
-      <DrawAnnotations images={ image } />
+      <div className='menu'>
+        <p>Hover these words</p>
+        { keywords.map((keyword, i) => (
+          <p key={ i } onMouseEnter={() => setHighlight(keyword)} onMouseLeave={() => setHighlight('')} className='menu-item'>{ keyword }</p>
+        ))}
+      </div>
+      { ocrLog && (ocrLog.status === 'recognizing text' && ocrLog.progress === 1) ?
+        <DrawAnnotations images={ image } highlightBoxes={ highlightBoxes } /> :
+        <p>{`Processing OCR ${ocrLog ? `${ocrLog.status} ${ocrLog.progress}` : ''}`}</p>
+      }
     </div>
   );
 }
