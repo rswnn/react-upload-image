@@ -149,18 +149,19 @@ const TestKonva = ( props ) => {
   const [highlightBoxes, setHighlightBoxes] = useState([]);
   const [ocrLog, setOcrLog] = useState(null);
   const [ocrWords, setOcrWords] = useState([]);
-
+  const [input, setInput] = useState('')
   useEffect(() => {
     if(image) {
       Tesseract.recognize(
         image,
         'eng',
         { logger: log => {
-          console.log(log);
+          //console.log(log);
           setOcrLog(log);
         } }
       ).then(({ data }) => {
-        setOcrWords(data.words)
+        let mappedWords = data.words.map((word, i) =>{return {...word, id: i}})
+        setOcrWords(mappedWords)
       })
     }
   }, [image])
@@ -172,9 +173,68 @@ const TestKonva = ( props ) => {
   }, [ocrWords, highlight])
 
   const keywords = [
-    'Lorem',
-    'Ipsum'
+    'Ipsum',
+    'lorem'
   ]
+
+  const getBoxes = () => {
+    console.log(input);
+    let arrInput = input.split(' ');
+
+    let result = [];
+    arrInput.map(x => {
+      ocrWords.forEach(word => {
+        if (word.text.toLowerCase() === x.toLowerCase()) result.push(word);
+      })
+    })
+
+    result.sort(function(a, b) { 
+      return a.id - b.id  
+    });
+
+    let newRes = []
+    result.forEach((x, i) => {
+      if (i > 0) {
+        if (x.id - result[i-1].id === 1) {
+          newRes.forEach((newR, indexNewR) => {
+            let indexId = newR.id.indexOf(result[i-1].id);
+            if (indexId > -1) {
+              newRes[indexNewR] = {
+                ...newRes[indexNewR],
+                x1: x.bbox.x1,
+                y1: x.bbox.y1,
+                id: [...newRes[indexNewR].id, x.id ]
+              }
+            }
+          })
+        } else {
+          newRes.push({
+            x0: x.bbox.x0,
+            y0: x.bbox.y0,
+            x1: x.bbox.x1,
+            y1: x.bbox.y1,
+            id: [x.id]
+          })
+        }
+      } else {
+        newRes.push({
+          x0: x.bbox.x0,
+          y0: x.bbox.y0,
+          x1: x.bbox.x1,
+          y1: x.bbox.y1,
+          id: [x.id]
+        })
+      }
+    })
+
+    if (arrInput.length !== 1) {
+      newRes = newRes.filter(x => x.id.length !== 1)
+    }
+   
+    console.log('newRes', newRes)
+
+    setHighlightBoxes(newRes);
+  }
 
   return (
     <div>
@@ -185,6 +245,8 @@ const TestKonva = ( props ) => {
           <p key={ i } onMouseEnter={() => setHighlight(keyword)} onMouseLeave={() => setHighlight('')} className='menu-item'>{ keyword }</p>
         ))}
       </div>
+      <input value={input} onChange={ e => setInput(e.target.value) }/>
+      <button onClick={getBoxes} >Search </button>
       { ocrLog && (ocrLog.status === 'recognizing text' && ocrLog.progress === 1) ?
         <DrawAnnotations images={ image } highlightBoxes={ highlightBoxes } /> :
         <p>{`Processing OCR ${ocrLog ? `${ocrLog.status} ${ocrLog.progress}` : ''}`}</p>
